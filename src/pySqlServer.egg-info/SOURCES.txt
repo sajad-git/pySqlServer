@@ -1,0 +1,9 @@
+LICENSE
+README.md
+pyproject.toml
+src/__init__.py
+src/pySqlServer.py
+src/pySqlServer.egg-info/PKG-INFO
+src/pySqlServer.egg-info/SOURCES.txt
+src/pySqlServer.egg-info/dependency_links.txt
+src/pySqlServer.egg-info/top_level.txt

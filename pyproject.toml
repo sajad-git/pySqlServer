@@ -1,0 +1,17 @@
+[project]
+name = "pySqlServer"
+version = "2.4.3"
+authors = [
+  { name="Sajad Khanbabaie", email="khanbabaie.sa@gmail.com" },
+]
+description = "PySQL is a Python library for interacting with SQL Server databases. It provides a simplified methodes for common database operations."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/sajad-git/PySQL"
