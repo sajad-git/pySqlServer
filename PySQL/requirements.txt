@@ -1,4 +1,0 @@
-pandas
-numpy
-sqlalchemy==1.4.32
-pyodbc
