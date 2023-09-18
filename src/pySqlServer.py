@@ -87,7 +87,7 @@ class Table_analyzer():
         non_null_values = column_data.dropna()
 
         # Calculate the maximum length of the texts in the list
-        max_text_length = max(len(text.encode()) for text in non_null_values)
+        max_text_length = max(len(str(text).encode()) for text in non_null_values)
 
         # Calculate the suitable n value considering the buffer and the max_length constraint
         if 0 <= buffer < 1:

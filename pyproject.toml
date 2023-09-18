@@ -1,6 +1,6 @@
 [project]
 name = "pySqlServer"
-version = "2.4.3"
+version = "2.4.6"
 authors = [
   { name="Sajad Khanbabaie", email="khanbabaie.sa@gmail.com" },
 ]
