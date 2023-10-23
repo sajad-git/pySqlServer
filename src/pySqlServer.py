@@ -1,3 +1,5 @@
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
 from datetime import datetime
 from sqlalchemy import create_engine, types, MetaData, Table, select, delete, and_, Column, PrimaryKeyConstraint
@@ -5,6 +7,8 @@ from sqlalchemy.exc import NoSuchTableError, NoSuchColumnError
 from sqlalchemy import schema as sqlalchemy_schema
 import numpy as np
 import warnings
+from tqdm import tqdm
+
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 class Table_analyzer():
@@ -138,7 +142,7 @@ class Table_analyzer():
 class PySQL():
     def __init__(self):
         self.log_dtypes =  {'function':types.VARCHAR(50), 'state':types.VARCHAR(50), 'log':types.VARCHAR(2000), 'connection_user':types.VARCHAR(50), 'process_id':types.INT(), 'datetime':types.DATETIME()}
-        self.dtypes_types = {'table':types.VARCHAR(50), 'schema':types.VARCHAR(50), 'dtypes_str':types.VARCHAR(4000), 'process_id':types.INT()}
+        self.dtypes_types = {'table':types.VARCHAR(50), 'schema':types.VARCHAR(50), 'dtypes_str':types.NVARCHAR(4000), 'process_id':types.INT()}
         self.process_id = -1
         self.dtypes = {}
         
@@ -205,8 +209,27 @@ class PySQL():
         self.process_id = self.lastlog.process_id.values.tolist()
         self.process_id = max([int(i) for i in self.process_id])
 
+    def n_batches_dataframe(self, dataframe, num_batches):
+        # Calculate the total number of rows in the DataFrame
+        total_rows = len(dataframe)
+        
+        # Calculate the batch size based on the number of batches
+        batch_size = total_rows // num_batches
+        
+        # Create a tqdm instance to display the progress bar
+        pbar = tqdm(total=num_batches, desc="sending to SQL")
+        
+        # Iterate through the DataFrame and yield the specified number of batches
+        for i in range(num_batches):
+            start_idx = i * batch_size
+            end_idx = start_idx + batch_size if i < num_batches - 1 else total_rows
+            yield dataframe.iloc[start_idx:end_idx]
+            pbar.update(1)  # Update the progress bar
+        pbar.close()  # Close the progress bar when done
+        
+
     @_log_decorator 
-    def to_sql(self, df, table_name, schema=None, if_exists='append', index=True, index_label=None, method=None, primary_key=None, chunksize=1, date_normalizer=True, text_cutter=True):
+    def to_sql(self, df, table_name, schema=None, if_exists='append', index=True, index_label=None, method=None, primary_key=None, chunksize=1, date_normalizer=True, text_cutter=True, verbose=False):
         """
         Write records stored in a DataFrame to a SQL database.
     
@@ -239,7 +262,8 @@ class PySQL():
             By default, all rows will be written at once.
         date_normalizer : bool, default True
             its run PySQL.date_normalizer and make date formats storable foe sql server
-    
+        verbose :  bool, default False
+            prgress bar for data sending
     
             .. versionadded:: 1.3.0
     
@@ -252,6 +276,7 @@ class PySQL():
             Number of rows affected by to_sql. None is returned if the callable
             passed into ``method`` does not return the number of rows.
         """
+        row_number = 0
         if schema!= None:
             if schema not in self.engine.dialect.get_schema_names(self.engine):  # check for schema existance
                 self.engine.execute(sqlalchemy_schema.CreateSchema(schema))
@@ -259,11 +284,31 @@ class PySQL():
         self.dtypes = self.dtypes | {'process_id':types.INT()}
         if date_normalizer:
             df = self.date_normalizer(df)
+
         if text_cutter:
             df = self.text_cutter(df)
-        
-        self.df = df
-        row_number = df.to_sql(name=table_name, con=self.engine, schema=schema, if_exists=if_exists, index=index, index_label=index_label, dtype=self.dtypes, chunksize=chunksize, method=method)
+
+        if verbose:
+            if_exists_flag = False
+            self.df = df
+            df_length = len(df)
+
+            if df_length > 1000:
+                n_batches = 1000
+                batches = self.n_batches_dataframe(df, n_batches)
+                for batch in batches:
+                    if if_exists_flag:
+                        if_exists = 'append'
+                    temp_row_number = batch.to_sql(name=table_name, con=self.engine, schema=schema, if_exists=if_exists, index=index, index_label=index_label, dtype=self.dtypes, chunksize=chunksize, method=method)
+                    row_number += temp_row_number
+                    if_exists_flag = True
+            else:
+                print('under 1000 records to_sql does not support progress bar')
+                self.df = df
+                row_number = df.to_sql(name=table_name, con=self.engine, schema=schema, if_exists=if_exists, index=index, index_label=index_label, dtype=self.dtypes, chunksize=chunksize, method=method)
+        else:
+            self.df = df
+            row_number = df.to_sql(name=table_name, con=self.engine, schema=schema, if_exists=if_exists, index=index, index_label=index_label, dtype=self.dtypes, chunksize=chunksize, method=method)
 
         if primary_key != None:
             self.set_primary_key(table_name=table_name, schema=schema, column_name=primary_key)
@@ -487,8 +532,10 @@ class PySQL():
             self.dtypes = self.dtypes.to_dict('records')[0]['dtypes_str']
             self.dtypes = eval(self.dtypes)
             self.dtypes = {i:eval(self.dtypes[i].replace('BOOLEAN', 'Boolean')) for i in self.dtypes} 
+            return True
         except:
             self.Error = "can't load dtypes table from database please try run PySQL.create_dtypes() first.  using Table_analyzer is suggested :) "
             raise Exception(self.Error)
+            return False
        
         

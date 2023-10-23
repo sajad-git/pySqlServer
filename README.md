@@ -66,13 +66,14 @@ pysql.create_dtypes(dtype_dict=dtype_dict, table_name='Test_table', schema='Test
 + at all next usages you must call load_dtypes and next you can use to_sql method to send data
 ```python
 pysql.load_dtypes(table_name='Test_table', schema='Test_schema')    # created before
-pysql.to_sql(df,'Test_table', schema='Test_schema', if_exists='append', text_cutter=True, date_normalizer=True, method='multi')
+pysql.to_sql(df,'Test_table', schema='Test_schema', if_exists='append', text_cutter=True, date_normalizer=True, method='multi', verbos=True)
 ```
 > + you can use primary_key='column_name' to set tables primary_key
 > + in next usages it's not allowed to use this
 > + 'text_cutter' trys to cut new text if those length was taller than column capacity
 > + 'date_normalizer' trys to make date format colums suitable for sql server
 > + method='multi' for insert multi row in ine query
+> + verbos=True --> show progress bar for your data transfer (default:False)
 
 + and there is some read data methods in order to read data from your database (returns pandas dataframe)
 ```python
