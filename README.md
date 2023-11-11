@@ -84,6 +84,15 @@ pysql.read_sql_query(query='SELECT * FROM TABLE_NAME')
 
 <br>
 
++ also you can update your table with a update_key and update_value
+> this line should update age of someone in the table named Bob Lookie to 83 YO!
+> in other way you can set update_key and update_value with list of dicts and it update all queries in a row (len(update_key) should be equal to len(update_value))
+```python
+pysql.update_table(table_name='personal_data', schema='persons', update_key={'name':'Bob', 'last_name':'Looki'}, update_value={'age':83})
+```
+
+<br>
+
 + logger is a common method to use ( it logs datetime and process_id and actor_user in order to make your actions trackable )
 > every to_sql calls can join with logs with 'process_id' column , so you can find who and when it's started to store data and how long takes it process
 ```python

@@ -40,7 +40,7 @@ class Table_analyzer():
                 if date_has_time(column_data):
                     return "DATETIME"
                 return "DATE"
-            except ValueError:
+            except :
                 return False
             
         column_data = df[column_name]
@@ -140,11 +140,21 @@ class Table_analyzer():
 
 
 class PySQL():
-    def __init__(self):
+    def __init__(self, if_error='pass'):
+        """
+        Init
+
+        Args:
+            if_error(str): pass / raise default=pass
+            
+        Returns:
+            PySQL object.
+        """
         self.log_dtypes =  {'function':types.VARCHAR(50), 'state':types.VARCHAR(50), 'log':types.VARCHAR(2000), 'connection_user':types.VARCHAR(50), 'process_id':types.INT(), 'datetime':types.DATETIME()}
         self.dtypes_types = {'table':types.VARCHAR(50), 'schema':types.VARCHAR(50), 'dtypes_str':types.NVARCHAR(4000), 'process_id':types.INT()}
         self.process_id = -1
         self.dtypes = {}
+        self.if_error = if_error
         
     def _log_decorator(func):  
         def wrapper(self, *args, **kwargs):
@@ -157,6 +167,8 @@ class PySQL():
             except Exception as Error:
                 print(Error)
                 self.logger(func.__name__ , 'progress', str(Error))
+                if self.if_error == 'raise':
+                    raise Error
         return wrapper    
     
     def logger(self, func, state, log):
@@ -440,6 +452,42 @@ class PySQL():
         """
         return pd.read_sql_query(query, con=self.engine, index_col=index_col, coerce_float=coerce_float, params=params, parse_dates=parse_dates, chunksize=chunksize, dtype=dtype)
     
+    @_log_decorator
+    def update_table(self, table_name, schema='dbo', update_key=None, update_value=None, print_query=False):
+        """
+            function to update table values with a [list of] dictionary.
+
+            Parameters
+            ----------
+            table_name : str
+                Name of SQL table in database.
+            schema : str, default dbo
+                Name of SQL schema in database to query (if database flavor
+                supports this). Uses default schema if dbo (default).
+            update_key : Dict or list of Dicts
+                json data in {'column_name': replace_key}
+            update_value : Dict or list of Dicts
+                json data in {'column1_name': to_replace_value, 'column2_name': to_replace_value}
+            
+            Returns
+            -------
+            1
+        """
+        if type(update_key)==list:
+            for update_value, update_key in zip(update_value, update_key):
+                QUERY = f'UPDATE {schema}.{table_name}'
+                QUERY += ' SET ' + ' , '.join([f" {i} = '{update_value[i]}' " for i in update_value.keys()])
+                QUERY += ' WHERE ' + ' and '.join([f" {i} = '{update_key[i]}' " for i in update_key.keys()])
+                self.engine.execute(QUERY)
+        else:    
+            QUERY = f'UPDATE {schema}.{table_name}'
+            QUERY += ' SET ' + ' , '.join([f" {i} = '{update_value[i]}' " for i in update_value.keys()])
+            QUERY += ' WHERE ' + ' and '.join([f" {i} = '{update_key[i]}' " for i in update_key.keys()])
+            if print_query:
+                print(QUERY)
+            self.engine.execute(QUERY)
+        return 1
+
     def date_has_time(self, column_data):
         non_null_values = column_data.dropna()
         for date in non_null_values:
@@ -460,6 +508,9 @@ class PySQL():
     
     def cutter_n_finder(self, dtype):
         n = str(dtype).split('(')[1][:-1]
+        if int(n) > 3800:
+            print('cutted ', str(n))
+            return 3800
         return int(n)
             
     def text_cutter(self, df):

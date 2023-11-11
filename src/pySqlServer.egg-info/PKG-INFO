@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: pySqlServer
-Version: 2.9.9
+Version: 3.1.7
 Summary: PySQL is a Python library for interacting with SQL Server databases. It provides a simplified methodes for common database operations.
 Author-email: Sajad Khanbabaie <khanbabaie.sa@gmail.com>
 Project-URL: Homepage, https://github.com/sajad-git/PySQL
@@ -93,6 +93,15 @@ pysql.to_sql(df,'Test_table', schema='Test_schema', if_exists='append', text_cut
 pysql.tables_list(schema=None)
 pysql.read_sql_table(table_name, schema=None)
 pysql.read_sql_query(query='SELECT * FROM TABLE_NAME')
+```
+
+<br>
+
++ also you can update your table with a update_key and update_value
+> this line should update age of someone in the table named Bob Lookie to 83 YO!
+> in other way you can set update_key and update_value with list of dicts and it update all queries in a row (len(update_key) should be equal to len(update_value))
+```python
+pysql.update_table(table_name='personal_data', schema='persons', update_key={'name':'Bob', 'last_name':'Looki'}, update_value={'age':83})
 ```
 
 <br>
