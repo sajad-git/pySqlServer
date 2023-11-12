@@ -5,8 +5,6 @@ from datetime import datetime
 from sqlalchemy import create_engine, types, MetaData, Table, select, delete, and_, Column, PrimaryKeyConstraint
 from sqlalchemy.exc import NoSuchTableError, NoSuchColumnError
 from sqlalchemy import schema as sqlalchemy_schema
-from sqlalchemy import text as sql_text
-from sqlalchemy import inspect
 import numpy as np
 import warnings
 from tqdm import tqdm
@@ -157,7 +155,7 @@ class PySQL():
         self.process_id = -1
         self.dtypes = {}
         self.if_error = if_error
-    
+        
     def _log_decorator(func):  
         def wrapper(self, *args, **kwargs):
             try:
@@ -189,17 +187,15 @@ class PySQL():
         """
         if len(log)> 2000:
             log = log[:1999]
-        if 'config' not in self.inspector.get_schema_names():  # check for config schema
-            with self.engine.connect() as conn:
-                conn.execute(sqlalchemy_schema.CreateSchema('config'))
-                conn.commit()
+        if 'config' not in self.engine.dialect.get_schema_names(self.engine):  # check for config schema
+            self.engine.execute(sqlalchemy_schema.CreateSchema('config'))
             print('config schema not exist! \n new created!')
         now = datetime.now().isoformat().replace('T', ' ').split('.')[0]
         log_data = {'function':func, 'state':state, 'log':log,'connection_user':self.username ,'process_id':self.process_id, 'datetime':now}
         self.log_data = pd.DataFrame([log_data])
         self.log_data.to_sql('log', con=self.engine, schema='config', if_exists='append', dtype=self.log_dtypes, index=False)
         
-    def create_connection(self, server=None, database='temp', username=None, password=None, port=1433, local_sql=False):
+    def create_connection(self, server, database, username, password, port=1433):
         """
         creates a pysql.engine connection to your target database
         in order to have best experience to use, your sql_user(username) must to have datawriter, datareader and ddladmin 
@@ -209,31 +205,21 @@ class PySQL():
             username (str): username 
             password (str): password 
             port (str): connection port default : 1433
-            local_sql (bool): if True PySQL try to connect to local sql_server with windows auth
+            
         Returns:
             None
         """
-        if local_sql:
-            self.connection_str = f'mssql+pyodbc://server/{self.database}'
-            self.engine = create_engine(self.connection_str)
-            self.inspector = inspect(self.engine)
-            self.logger('create_connection', 'success', 'connected')
-            self.lastlog = self.read_sql_table('log', schema='config', columns=['process_id'])
-            self.process_id = self.lastlog.process_id.values.tolist()
-            self.process_id = max([int(i) for i in self.process_id])
-        else:
-            self.server = server
-            self.database = database
-            self.username = username
-            self.password = password
-            self.port = port
-            self.connection_str = f"mssql+pyodbc://{self.username}:{self.password}@{self.server}:{self.port}/{self.database}?driver=ODBC+Driver+17+for+SQL+Server"
-            self.engine = create_engine(self.connection_str)
-            self.inspector = inspect(self.engine)
-            self.logger('create_connection', 'success', 'connected')
-            self.lastlog = self.read_sql_table('log', schema='config', columns=['process_id'])
-            self.process_id = self.lastlog.process_id.values.tolist()
-            self.process_id = max([int(i) for i in self.process_id])
+        self.server = server
+        self.database = database
+        self.username = username
+        self.password = password
+        self.port = port
+        self.connection_str = f"mssql+pyodbc://{self.username}:{self.password}@{self.server}:{self.port}/{self.database}?driver=ODBC+Driver+17+for+SQL+Server"
+        self.engine = create_engine(self.connection_str)
+        self.logger('create_connection', 'success', 'connected')
+        self.lastlog = self.read_sql_table('log', schema='config', columns=['process_id'])
+        self.process_id = self.lastlog.process_id.values.tolist()
+        self.process_id = max([int(i) for i in self.process_id])
 
     def n_batches_dataframe(self, dataframe, num_batches):
         # Calculate the total number of rows in the DataFrame
@@ -304,10 +290,8 @@ class PySQL():
         """
         row_number = 0
         if schema!= None:
-            if schema not in self.inspector.get_schema_names():  # check for schema existance
-                with self.engine.connect() as conn:
-                    conn.execute(sqlalchemy_schema.CreateSchema(schema))
-                    conn.commit()
+            if schema not in self.engine.dialect.get_schema_names(self.engine):  # check for schema existance
+                self.engine.execute(sqlalchemy_schema.CreateSchema(schema))
         df['process_id'] = [self.process_id]*len(df)
         self.dtypes = self.dtypes | {'process_id':types.INT()}
         if date_normalizer:
@@ -494,18 +478,14 @@ class PySQL():
                 QUERY = f'UPDATE {schema}.{table_name}'
                 QUERY += ' SET ' + ' , '.join([f" {i} = '{update_value[i]}' " for i in update_value.keys()])
                 QUERY += ' WHERE ' + ' and '.join([f" {i} = '{update_key[i]}' " for i in update_key.keys()])
-                with self.engine.connect() as conn:
-                    conn.execute(sql_text(QUERY))
-                    conn.commit()
+                self.engine.execute(QUERY)
         else:    
             QUERY = f'UPDATE {schema}.{table_name}'
             QUERY += ' SET ' + ' , '.join([f" {i} = '{update_value[i]}' " for i in update_value.keys()])
             QUERY += ' WHERE ' + ' and '.join([f" {i} = '{update_key[i]}' " for i in update_key.keys()])
             if print_query:
                 print(QUERY)
-            with self.engine.connect() as conn:
-                conn.execute(sql_text(QUERY))
-                conn.commit()
+            self.engine.execute(QUERY)
         return 1
 
     def date_has_time(self, column_data):
@@ -560,15 +540,11 @@ class PySQL():
             
         primary_key_dtype = str(self.dtypes[column_name])
         QUERY = f"""ALTER TABLE {table_name} alter column {column_name} {primary_key_dtype} NOT NULL"""
-        with self.engine.connect() as conn:
-            conn.execute(sql_text(QUERY))
-            conn.commit()
+        self.engine.execute(QUERY)   
         QUERY = f"""ALTER TABLE {table_name}
                     ADD PRIMARY KEY ({column_name});"""
-        with self.engine.connect() as conn:
-            conn.execute(sql_text(QUERY))
-            conn.commit()
-        print(f'primary key sets on {column_name} with out any error')
+        self.engine.execute(QUERY)
+        print('primary key sets on {column_name} with out any error')
         
     @_log_decorator 
     def create_dtypes(self, dtype_dict, table_name, schema=None):

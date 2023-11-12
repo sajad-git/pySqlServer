@@ -14,11 +14,11 @@ pySQL requires the following packages:
 
 - pandas
 - numpy
-- sqlalchemy==1.4.32
+- sqlalchemy
 - pyodbc
   
 ```python
-pip install pandas numpy sqlalchemy==1.4.32 pyodbc
+pip install pandas numpy sqlalchemy pyodbc
 ```
 
 # Usage
@@ -49,9 +49,10 @@ dtype_dict = TA.analyze(df,texts_buffer=0.2)
 + Create a connection
 ```python
 pysql = PySQL()
-pysql.create_connection(server='host_ip', database='mydb', username='myuser', password='mypassword')
+pysql.create_connection(server='host_ip', database='mydb', username='myuser', password='mypassword', local_sql=False)
 ```
 > your user must have 'db_datareader', 'db_datawriter', 'db_ddlAdmin' permissions to module works perfectly
+> set local_sql=True for windows auth in local SQL Server
 
 <br>
 
