@@ -37,7 +37,7 @@ class Table_analyzer():
             try:
                 # Attempt to convert the cleaned column data to datetime
                 column_data_len = len(column_data)
-                column_data = column_data.sample(n=100) if column_data_len > 100 else column_data.sample(n=column_data_len)
+                column_data = column_data.sample(n=2000) if column_data_len > 2000 else column_data.sample(n=column_data_len)
                 column_data = pd.to_datetime(column_data)
                 if date_has_time(column_data):
                     return "DATETIME"
@@ -214,7 +214,9 @@ class PySQL():
             None
         """
         if local_sql:
-            self.connection_str = f'mssql+pyodbc://server/{self.database}'
+            self.database = database
+            self.username = 'WINDOWS_AUTH'
+            self.connection_str = f'mssql+pyodbc://localhost/{self.database}?driver=ODBC+Driver+17+for+SQL+Server'
             self.engine = create_engine(self.connection_str)
             self.inspector = inspect(self.engine)
             self.logger('create_connection', 'success', 'connected')
@@ -515,15 +517,38 @@ class PySQL():
                 return True
         return False
     
+    def datetime_to_isoformat(self, date):
+        try:
+            date = date.isoformat().split('+')[0].replace('T',' ')
+        except:
+            pass
+        if len(str(date)) != 19:
+            print(date)
+            date = '2000-01-01 00:00:00.000'
+        return date
+    
+    def date_to_isoformat(self, date):
+        try:
+            date = date.isoformat().split('+')[0].split('T')[0]
+        except:
+            pass
+        if len(str(date)) != 10:
+            date = '2000-01-01'
+        return date
+
     def date_normalizer(self, df):
         for key, value in self.dtypes.items():
             if 'DATE' in str(value):
-                df[key] = pd.to_datetime(df[key])
+                df[key] = pd.to_datetime(df[key] ,errors='coerce')
                 has_time = self.date_has_time(df[key])
                 if has_time:
-                    df[key] = df[key].apply(lambda x:x.isoformat().split('+')[0].replace('T',' '))
+                    df[key] = df[key].apply(self.datetime_to_isoformat)
                 else:
-                    df[key] = df[key].apply(lambda x:x.isoformat().split('+')[0].split('T')[0])
+                    df[key] = df[key].apply(self.date_to_isoformat)
+                # if has_time:
+                #     df[key] = df[key].apply(lambda x:x.isoformat().split('+')[0].replace('T',' '))
+                # else:
+                #     df[key] = df[key].apply(lambda x:x.isoformat().split('+')[0].split('T')[0])
         return df
     
     def cutter_n_finder(self, dtype):
