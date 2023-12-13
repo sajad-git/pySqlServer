@@ -18,7 +18,7 @@ pySQL requires the following packages:
 - pyodbc
   
 ```python
-pip install pandas numpy sqlalchemy pyodbc
+pip install pandas numpy sqlalchemy pyodbc pysqlserver
 ```
 
 # Usage
